@@ -13,22 +13,21 @@ type Credentials struct {
 }
 
 type User struct {
-	Id       int64          `json:"id" db:"id"`
-	Email    string         `json:"email" db:"email"`
-	Password string         `json:"password" db:"password"`
-	Tel      sql.NullString `json:"tel" db:"tel"`
-	Name     string         `json:"name" db:"name"`
-	Surname  sql.NullString `json:"surname" db:"surname"`
-	// BirthDate   time.Time      `json:"birthDate" db:"birth_date"`
-	BirthDate sql.NullTime `json:"birthDate" db:"birth_date"`
-	CountryId int64        `json:"countryId" db:"country_id"`
-	// CountryId   sql.NullInt64          `json:"countryId" db:"country_id"`
-	CityId      int64          `json:"cityId" db:"city_id"`
-	GoogleId    sql.NullString `json:"googleId" db:"google_id"`
-	VkontakteId sql.NullString `json:"vkontakteId" db:"vkontakte_id"`
-	TelegramId  sql.NullString `json:"telegramId" db:"telegram_id"`
-	CreatedAt   time.Time      `json:"createdAt" db:"created_at"`
-	Timezone    string         `json:"timezone" db:"timezone"`
+	Id           int64          `json:"id" db:"id"`
+	Email        string         `json:"email" db:"email"`
+	Password     string         `json:"password" db:"password"`
+	Tel          sql.NullString `json:"tel" db:"tel"`
+	Name         string         `json:"name" db:"name"`
+	Surname      sql.NullString `json:"surname" db:"surname"`
+	BirthDate    sql.NullTime   `json:"birthDate" db:"birth_date"`
+	CountryId    int64          `json:"countryId" db:"country_id"`
+	CityId       int64          `json:"cityId" db:"city_id"`
+	GoogleId     sql.NullString `json:"googleId" db:"google_id"`
+	VkontakteId  sql.NullString `json:"vkontakteId" db:"vkontakte_id"`
+	TelegramId   sql.NullString `json:"telegramId" db:"telegram_id"`
+	CreatedAt    time.Time      `json:"createdAt" db:"created_at"`
+	Timezone     string         `json:"timezone" db:"timezone"`
+	RefreshToken sql.NullString `json:"-" db:"refresh_token"`
 }
 
 func (u User) MarshalJSON() ([]byte, error) {

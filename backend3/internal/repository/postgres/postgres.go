@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -13,16 +14,19 @@ import (
 
 // SQL query constants
 const (
-	queryGetIncomingPostbacks = "SELECT * FROM incoming_postback"
-	queryGetTrackers          = "SELECT * FROM tracker"
-	queryGetSendPostbacks     = "SELECT * FROM send_postback"
-	// queryCreateUser               = "INSERT INTO users(email, password, name, timezone) VALUES ($1, $2, $3, '+3')"
+	queryGetIncomingPostbacks     = "SELECT * FROM incoming_postback"
+	queryGetTrackers              = "SELECT * FROM tracker"
+	queryGetSendPostbacks         = "SELECT * FROM send_postback"
 	queryCreateUser               = "INSERT INTO users(email, password, name, timezone) VALUES ($1, $2, $3, $4)"
 	queryUpdateUser               = "UPDATE users SET name = $2, surname = $3, birth_date = $4, country_id = $5, city_id = $6, google_id = $7, vkontakte_id = $8, telegram_id = $9, timezone = '+3' WHERE id = $1"
 	queryUpdateUserCredentials    = "UPDATE users SET email = $2, tel = $3 WHERE id = $1"
 	queryUpdateUserCredentialsPwd = "UPDATE users SET email = $2, password = $3, tel = $4 WHERE id = $1"
 	queryGetCredentials           = "SELECT email, password FROM users WHERE email = $1"
 	queryGetUser                  = "SELECT id, email, tel, name, surname, birth_date, country_id, city_id, google_id, vkontakte_id, telegram_id, created_at, timezone FROM users WHERE id = $1"
+	queryGetUserIdByEmail         = "SELECT id FROM users WHERE email = $1"
+	querySaveRefreshToken         = "UPDATE users SET refresh_token = $2 WHERE id = $1"
+	queryGetRefreshToken          = "SELECT refresh_token FROM users WHERE id = $1"
+	queryDeleteRefreshToken       = "UPDATE users SET refresh_token = NULL WHERE id = $1"
 )
 
 type Repository struct {
@@ -193,4 +197,35 @@ func (r *Repository) GetCredentials(ctx context.Context, email string) (*model.C
 	}
 
 	return nil, fmt.Errorf("User not found")
+}
+
+func (r *Repository) GetUserIdByEmail(ctx context.Context, email string) (int64, error) {
+	var userId int64
+	err := r.db.QueryRow(ctx, queryGetUserIdByEmail, email).Scan(&userId)
+	if err != nil {
+		return 0, fmt.Errorf("user not found: %w", err)
+	}
+	return userId, nil
+}
+
+func (r *Repository) SaveRefreshToken(ctx context.Context, userId int64, refreshToken string) error {
+	_, err := r.db.Exec(ctx, querySaveRefreshToken, userId, refreshToken)
+	return err
+}
+
+func (r *Repository) GetRefreshToken(ctx context.Context, userId int64) (string, error) {
+	var refreshToken sql.NullString
+	err := r.db.QueryRow(ctx, queryGetRefreshToken, userId).Scan(&refreshToken)
+	if err != nil {
+		return "", fmt.Errorf("failed to get refresh token: %w", err)
+	}
+	if !refreshToken.Valid {
+		return "", fmt.Errorf("refresh token not found")
+	}
+	return refreshToken.String, nil
+}
+
+func (r *Repository) DeleteRefreshToken(ctx context.Context, userId int64) error {
+	_, err := r.db.Exec(ctx, queryDeleteRefreshToken, userId)
+	return err
 }
