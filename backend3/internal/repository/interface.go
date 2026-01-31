@@ -15,4 +15,8 @@ type Repository interface {
 	UpdateUserCredentials(ctx context.Context, user *model.User) error
 	GetCredentials(ctx context.Context, email string) (*model.Credentials, error)
 	GetUser(ctx context.Context, id int64) (*model.User, error)
+	GetUserIdByEmail(ctx context.Context, email string) (int64, error)
+	SaveRefreshToken(ctx context.Context, userId int64, refreshToken string) error
+	GetRefreshToken(ctx context.Context, userId int64) (string, error)
+	DeleteRefreshToken(ctx context.Context, userId int64) error
 }

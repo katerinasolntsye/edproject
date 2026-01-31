@@ -1,0 +1,284 @@
+### JWT Authentication API Tests
+### Используйте REST Client extension для VS Code или подобный инструмент
+
+@baseUrl = http://localhost:8000/api/v1
+@contentType = application/json
+
+### Переменные (обновите после получения токенов)
+@accessToken = YOUR_ACCESS_TOKEN_HERE
+@refreshToken = YOUR_REFRESH_TOKEN_HERE
+@userId = 1
+
+###########################################
+# Публичные endpoints (без авторизации)
+###########################################
+
+### 1. Регистрация нового пользователя
+POST {{baseUrl}}/signup
+Content-Type: {{contentType}}
+
+{
+  "email": "test@example.com",
+  "password": "secure123",
+  "name": "Test User",
+  "timezone": "+3"
+}
+
+###
+
+### 2. Вход в систему (получение токенов)
+# ВАЖНО: Скопируйте accessToken и refreshToken из ответа
+POST {{baseUrl}}/signin
+Content-Type: {{contentType}}
+
+{
+  "email": "test@example.com",
+  "password": "secure123"
+}
+
+###
+
+### 3. Обновление токенов
+POST {{baseUrl}}/refresh
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+###
+
+###########################################
+# Защищенные endpoints (требуют токен)
+###########################################
+
+### 4. Получить данные пользователя
+GET {{baseUrl}}/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+###
+
+### 5. Обновить данные пользователя
+POST {{baseUrl}}/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Updated Name",
+  "surname": "Updated Surname",
+  "timezone": "+3",
+  "countryId": 1,
+  "cityId": 1
+}
+
+###
+
+### 6. Обновить credentials пользователя
+POST {{baseUrl}}/user/{{userId}}/creds
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "email": "newemail@example.com",
+  "tel": "+1234567890"
+}
+
+###
+
+### 7. Обновить пароль
+POST {{baseUrl}}/user/{{userId}}/creds
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "email": "test@example.com",
+  "password": "newsecurepassword",
+  "tel": "+1234567890"
+}
+
+###
+
+### 8. Получить incoming postbacks
+GET {{baseUrl}}/incoming
+Authorization: Bearer {{accessToken}}
+
+###
+
+### 9. Получить trackers
+GET {{baseUrl}}/tracker
+Authorization: Bearer {{accessToken}}
+
+###
+
+### 10. Получить send postbacks
+GET {{baseUrl}}/sendpostback
+Authorization: Bearer {{accessToken}}
+
+###
+
+### 11. Выход из системы
+POST {{baseUrl}}/logout
+Authorization: Bearer {{accessToken}}
+
+###
+
+###########################################
+# Тесты ошибок
+###########################################
+
+### 12. Доступ без токена (должно вернуть 401)
+GET {{baseUrl}}/user/{{userId}}
+
+###
+
+### 13. Доступ с невалидным токеном (должно вернуть 401)
+GET {{baseUrl}}/user/{{userId}}
+Authorization: Bearer invalid_token_here
+
+###
+
+### 14. Доступ к чужим данным (должно вернуть 403)
+GET {{baseUrl}}/user/999
+Authorization: Bearer {{accessToken}}
+
+###
+
+### 15. Вход с неправильным паролем (должно вернуть 401)
+POST {{baseUrl}}/signin
+Content-Type: {{contentType}}
+
+{
+  "email": "test@example.com",
+  "password": "wrongpassword"
+}
+
+###
+
+### 16. Вход с несуществующим email (должно вернуть 401)
+POST {{baseUrl}}/signin
+Content-Type: {{contentType}}
+
+{
+  "email": "nonexistent@example.com",
+  "password": "secure123"
+}
+
+###
+
+### 17. Обновление с невалидным refresh токеном (должно вернуть 401)
+POST {{baseUrl}}/refresh
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "invalid_refresh_token"
+}
+
+###
+
+###########################################
+# Полный сценарий тестирования
+###########################################
+
+### Сценарий 1: Регистрация -> Вход -> Доступ к данным -> Выход
+
+# Шаг 1: Регистрация
+POST {{baseUrl}}/signup
+Content-Type: {{contentType}}
+
+{
+  "email": "scenario1@test.com",
+  "password": "test123",
+  "name": "Scenario User",
+  "timezone": "+3"
+}
+
+###
+
+# Шаг 2: Вход (сохраните токены!)
+POST {{baseUrl}}/signin
+Content-Type: {{contentType}}
+
+{
+  "email": "scenario1@test.com",
+  "password": "test123"
+}
+
+###
+
+# Шаг 3: Получить данные (используйте полученный токен)
+# Обновите @accessToken и @userId выше!
+GET {{baseUrl}}/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+###
+
+# Шаг 4: Обновить данные
+POST {{baseUrl}}/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Updated Scenario User",
+  "timezone": "+3",
+  "countryId": 1,
+  "cityId": 1
+}
+
+###
+
+# Шаг 5: Выход
+POST {{baseUrl}}/logout
+Authorization: Bearer {{accessToken}}
+
+###
+
+# Шаг 6: Попытка доступа после выхода (должно вернуть 401 при повторном использовании refresh токена)
+POST {{baseUrl}}/refresh
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+###
+
+###########################################
+# Тест истечения и обновления токенов
+###########################################
+
+### Сценарий 2: Обновление истекшего access токена
+
+# Шаг 1: Вход
+POST {{baseUrl}}/signin
+Content-Type: {{contentType}}
+
+{
+  "email": "test@example.com",
+  "password": "secure123"
+}
+
+###
+
+# Шаг 2: Подождите 15+ минут (или измените JWT_ACCESS_EXPIRATION=1 минута для быстрого теста)
+# Затем попробуйте получить данные с истекшим access токеном (должно вернуть 401)
+GET {{baseUrl}}/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+###
+
+# Шаг 3: Обновите токены используя refresh token
+POST {{baseUrl}}/refresh
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+###
+
+# Шаг 4: Попробуйте снова с новым access токеном (должно работать)
+# Обновите @accessToken выше новым токеном!
+GET {{baseUrl}}/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+###

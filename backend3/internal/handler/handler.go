@@ -145,8 +145,6 @@ func (h *Handler) Signin(w http.ResponseWriter, r *http.Request) {
 
 	var creds model.Credentials
 
-	// fmt.Println(r.Body)
-
 	err := json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -154,19 +152,23 @@ func (h *Handler) Signin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// fmt.Println(creds)
-
-	err = h.service.CheckUser(r.Context(), creds)
+	// Аутентифицируем пользователя и получаем токены
+	accessToken, refreshToken, userId, err := h.service.AuthenticateUser(r.Context(), creds)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to login user"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid credentials"})
 		return
 	}
 
+	// Возвращаем токены и информацию о пользователе
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "User login successfully"})
-
-	// fmt.Println(creds)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":      "User logged in successfully",
+		"accessToken":  accessToken,
+		"refreshToken": refreshToken,
+		"userId":       userId,
+		"email":        creds.Email,
+	})
 }
 
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
@@ -188,6 +190,14 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Проверяем, что пользователь запрашивает свои данные
+	userIdFromToken, ok := r.Context().Value("userId").(int64)
+	if ok && userIdFromToken != int64(userId) {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Access denied"})
+		return
+	}
+
 	user, err := h.service.GetUser(r.Context(), int64(userId))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -196,4 +206,65 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(user)
+}
+
+// RefreshToken обновляет токены используя refresh token
+func (h *Handler) RefreshToken(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+
+	var request struct {
+		RefreshToken string `json:"refreshToken"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	if request.RefreshToken == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Refresh token is required"})
+		return
+	}
+
+	// Обновляем токены
+	newAccessToken, newRefreshToken, err := h.service.RefreshTokens(r.Context(), request.RefreshToken)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid refresh token"})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"accessToken":  newAccessToken,
+		"refreshToken": newRefreshToken,
+	})
+}
+
+// Logout удаляет refresh token пользователя
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+
+	// Извлекаем userId из context (установлен middleware)
+	userId, ok := r.Context().Value("userId").(int64)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized"})
+		return
+	}
+
+	err := h.service.Logout(r.Context(), userId)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to logout"})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Logged out successfully"})
 }
